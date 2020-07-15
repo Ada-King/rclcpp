@@ -102,7 +102,7 @@ Node::Node(
       node_name,
       namespace_,
       options.context(),
-      *(options.get_rcl_node_options()),
+      *(options.get_rcl_node_options())),
       options.use_intra_process_comms(),
       options.enable_topic_statistics())),
   node_graph_(new rclcpp::node_interfaces::NodeGraph(node_base_.get())),

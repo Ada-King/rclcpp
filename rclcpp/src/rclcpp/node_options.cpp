@@ -19,6 +19,7 @@
 #include <string>
 #include <vector>
 #include <utility>
+#include <map>
 
 #include "rclcpp/detail/utilities.hpp"
 #include "rclcpp/exceptions.hpp"
@@ -94,6 +95,7 @@ NodeOptions::get_rcl_node_options() const
     node_options_->allocator = this->allocator_;
     node_options_->use_global_arguments = this->use_global_arguments_;
     node_options_->enable_rosout = this->enable_rosout_;
+	node_options_->rosout_qos = this->get_rosout_qos_profile_from_env;
 
     int c_argc = 0;
     std::unique_ptr<const char *[]> c_argv;
@@ -321,5 +323,88 @@ NodeOptions::allocator(rcl_allocator_t allocator)
   this->allocator_ = allocator;
   return *this;
 }
+
+rmw_qos_profile_t 
+NodeOptions::get_rosout_qos_profile_from_env() const
+{
+  // Obtained the rosout qos setting through environment variables.
+  rmw_qos_profile_t rosout_qos_profile = rmw_rosout_qos_profile_default;
+  const char *get_env_error_str = nullptr;
+  const char *qos_depth = nullptr;
+  const char *qos_durability = nullptr;
+  const char *qos_lifespan = nullptr;
+  char *end = nullptr;
+  uint32_t number = 0;
+  uint64_t sec = 0;
+  uint64_t nsec = 0;
+  constexpr const char *depth_env_var = "ROSOUT_QOS_DEPTH";
+  constexpr const char *durability_env_var = "ROSOUT_QOS_DURABILITY";
+  constexpr const char *lifespan_env_var = "ROSOUT_QOS_LIFESPAN";
+
+  auto qos_depth_callback = [&](){
+	  number = strtoul(qos_depth, &end, 0);
+	  if(0 == number && *end != '\0'){
+	  	throw std::runtime_error("ROSOUT_QOS_DEPTH is not an integral number");
+	  }else if(number == ULONG_MAX && errno == ERANGE || number > std::numeric::limits<uint32_t>::max()){
+	  	throw std::runtime_error("ROSOUT_QOS_DEPTH is not an valid number( > 0)");
+	  }else{
+	  	rosout_qos_profile.depth = static_cast<size_t>(number);
+	  }
+  };
+  
+  auto qos_durability_callback = [&](){
+	  std::map<std::string, rmw_qos_durability_policy_t> durability_map{
+		  {"ROSOUT_DEFAULT", RMW_QOS_POLICY_DURABILITY_SYSTEM_DEFAULT},
+		  {"ROSOUT_TRANSIENT_LOCAL", RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL},
+		  {"ROSOUT_VOLATILE", RMW_QOS_POLICY_DURABILITY_VOLATILE}
+	  };
+	  auto iter = durability_map.find(qos_durability);
+	  if(iter != durability_map.end())
+		  rosout_qos_profile.durability = iter->second;
+  };
+
+  auto qos_lifespan_callback = [&](){
+	  char *tmp_nsec = nullptr;
+	  char *tmp_sec = strtok(const_cast<char *>(qos_lifespan), ".");
+	  if(tmp_sec != NULL)
+	  {
+	  	sec = atoi(tmp_sec);
+		tmp_nsec = strtok(NULL, ".");
+	  }
+	  if(NULL == tmp_sec || NULL == tmp_nsec)
+	  	return;
+	  
+	  nsec = atoi(tmp_nsec);
+	  rosout_qos_profile.lifespan.sec = sec;
+	  rosout_qos_profile.lifespan.nsec = nsec;
+  };
+  
+  get_env_error_str = rcutils_get_env(depth_env_var, &qos_depth)
+  if (NULL != get_env_error_str) {
+    throw std::runtime_error("failed to interpret ROSOUT_QOS_DEPTH as integral number");
+  }
+  if(qos_depth && qos_depth != ""){
+	qos_depth_callback();
+  }
+
+  get_env_error_str = rcutils_get_env(durability_env_var, &qos_durability);
+  if(get_env_error_str != NULL){
+	 throw std::runtime_error("failed to interpret ROSOUT_QOS_DURABILITY as integral number");
+  }
+  if(qos_durability && qos_durability != ""){
+	 qos_durability_callback();
+  }
+  
+  get_env_error_str = rcutils_get_env(lifespan_env_var, &qos_lifespan);
+  if(get_env_error_str!= NULL){
+	 throw std::runtime_error("failed to interpret ROSOUT_QOS_LIFESPAN as integral number");
+  }
+  if(qos_lifespan && qos_lifespan != ""){
+	 qos_lifespan_callback();
+  }
+  
+  return rosout_qos_profile;
+}
+
 
 }  // namespace rclcpp
