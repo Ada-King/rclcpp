@@ -327,6 +327,15 @@ public:
   NodeOptions &
   allocator(rcl_allocator_t allocator);
 
+protected:
+  /// 
+  /**
+  * Obtained the rosout qos setting through environment variables.
+  */
+  RCLCPP_PUBLIC
+  rmw_qos_profile_t 
+  get_rosout_qos_profile_from_env() const;
+
 private:
   // This is mutable to allow for a const accessor which lazily creates the node options instance.
   /// Underlying rcl_node_options structure.

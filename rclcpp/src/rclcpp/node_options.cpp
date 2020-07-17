@@ -19,6 +19,7 @@
 #include <string>
 #include <vector>
 #include <utility>
+#include <climits>
 #include <map>
 
 #include "rclcpp/detail/utilities.hpp"
@@ -26,6 +27,8 @@
 #include "rclcpp/logging.hpp"
 #include "rclcpp/publisher_options.hpp"
 #include "rclcpp/qos.hpp"
+
+#include "rcutils/get_env.h"
 
 using rclcpp::exceptions::throw_from_rcl_error;
 
@@ -95,7 +98,7 @@ NodeOptions::get_rcl_node_options() const
     node_options_->allocator = this->allocator_;
     node_options_->use_global_arguments = this->use_global_arguments_;
     node_options_->enable_rosout = this->enable_rosout_;
-	node_options_->rosout_qos = this->get_rosout_qos_profile_from_env;
+	node_options_->rosout_qos = this->get_rosout_qos_profile_from_env();
 
     int c_argc = 0;
     std::unique_ptr<const char *[]> c_argv;
@@ -334,7 +337,7 @@ NodeOptions::get_rosout_qos_profile_from_env() const
   const char *qos_durability = nullptr;
   const char *qos_lifespan = nullptr;
   char *end = nullptr;
-  uint32_t number = 0;
+  unsigned long number = 0UL;
   uint64_t sec = 0;
   uint64_t nsec = 0;
   constexpr const char *depth_env_var = "ROSOUT_QOS_DEPTH";
@@ -344,8 +347,10 @@ NodeOptions::get_rosout_qos_profile_from_env() const
   auto qos_depth_callback = [&](){
 	  number = strtoul(qos_depth, &end, 0);
 	  if(0 == number && *end != '\0'){
-	  	throw std::runtime_error("ROSOUT_QOS_DEPTH is not an integral number");
-	  }else if(number == ULONG_MAX && errno == ERANGE || number > std::numeric::limits<uint32_t>::max()){
+		// TODO(dbt) : Maybe here shouldn't throw exception, if the user's setting is not resonable, 
+		// just ignore it. The same below.
+		throw std::runtime_error("ROSOUT_QOS_DEPTH is not an integral number");
+	  }else if((number == ULONG_MAX && errno == ERANGE) || number > std::numeric_limits<uint32_t>::max()){
 	  	throw std::runtime_error("ROSOUT_QOS_DEPTH is not an valid number( > 0)");
 	  }else{
 	  	rosout_qos_profile.depth = static_cast<size_t>(number);
@@ -374,16 +379,18 @@ NodeOptions::get_rosout_qos_profile_from_env() const
 	  if(NULL == tmp_sec || NULL == tmp_nsec)
 	  	return;
 	  
+	  // TODO(dbt) : Here should add a check to user's settings, if it's unresonable, 
+	  // then the value will not be set. I will do it later.
 	  nsec = atoi(tmp_nsec);
 	  rosout_qos_profile.lifespan.sec = sec;
 	  rosout_qos_profile.lifespan.nsec = nsec;
   };
   
-  get_env_error_str = rcutils_get_env(depth_env_var, &qos_depth)
+  get_env_error_str = rcutils_get_env(depth_env_var, &qos_depth);
   if (NULL != get_env_error_str) {
     throw std::runtime_error("failed to interpret ROSOUT_QOS_DEPTH as integral number");
   }
-  if(qos_depth && qos_depth != ""){
+  if(qos_depth && strcmp(qos_depth, "") != 0){
 	qos_depth_callback();
   }
 
@@ -391,7 +398,7 @@ NodeOptions::get_rosout_qos_profile_from_env() const
   if(get_env_error_str != NULL){
 	 throw std::runtime_error("failed to interpret ROSOUT_QOS_DURABILITY as integral number");
   }
-  if(qos_durability && qos_durability != ""){
+  if(qos_durability && strcmp(qos_durability, "") != 0){
 	 qos_durability_callback();
   }
   
@@ -399,7 +406,7 @@ NodeOptions::get_rosout_qos_profile_from_env() const
   if(get_env_error_str!= NULL){
 	 throw std::runtime_error("failed to interpret ROSOUT_QOS_LIFESPAN as integral number");
   }
-  if(qos_lifespan && qos_lifespan != ""){
+  if(qos_lifespan && strcmp(qos_lifespan, "") != 0){
 	 qos_lifespan_callback();
   }
   
