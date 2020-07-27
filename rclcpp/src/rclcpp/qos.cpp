@@ -67,6 +67,20 @@ KeepLast::KeepLast(size_t depth)
 : QoSInitialization(RMW_QOS_POLICY_HISTORY_KEEP_LAST, depth)
 {}
 
+RosoutQoSInitialization::RosoutQoSInitialization(size_t depth_arg, rmw_qos_durability_policy_t durability_policy_arg, rmw_time_t lifespan_arg)
+: depth(depth_arg), durability_policy(durability_policy_arg), lifespan(lifespan_arg)
+{}
+
+RosoutQoSInitialization
+RosoutQoSInitialization::from_rcl(const rmw_qos_profile_t & rosout_qos)
+{
+  return SetRosout(rosout_qos.depth, rosout_qos.durability, rosout_qos.lifespan);
+}
+
+SetRosout::SetRosout(size_t depth_arg, rmw_qos_durability_policy_t durability_policy_arg, rmw_time_t lifespan_arg)
+: RosoutQoSInitialization(depth_arg, durability_policy_arg, lifespan_arg)
+{}
+
 QoS::QoS(
   const QoSInitialization & qos_initialization,
   const rmw_qos_profile_t & initial_profile)
@@ -74,6 +88,16 @@ QoS::QoS(
 {
   rmw_qos_profile_.history = qos_initialization.history_policy;
   rmw_qos_profile_.depth = qos_initialization.depth;
+}
+
+QoS::QoS(
+  const RosoutQoSInitialization & qos_initialization,
+  const rmw_qos_profile_t & initial_profile)
+: rmw_qos_profile_(initial_profile)
+{
+  rmw_qos_profile_.depth = qos_initialization.depth;
+  rmw_qos_profile_.durability = qos_initialization.durability_policy;
+  rmw_qos_profile_.lifespan = qos_initialization.lifespan;
 }
 
 QoS::QoS(size_t history_depth)
@@ -249,6 +273,10 @@ ServicesQoS::ServicesQoS(const QoSInitialization & qos_initialization)
 
 ParameterEventsQoS::ParameterEventsQoS(const QoSInitialization & qos_initialization)
 : QoS(qos_initialization, rmw_qos_profile_parameter_events)
+{}
+
+RosoutQoS::RosoutQoS(const RosoutQoSInitialization & rosout_initialization)
+: QoS(rosout_initialization, rcl_qos_profile_rosout_default)
 {}
 
 SystemDefaultsQoS::SystemDefaultsQoS(const QoSInitialization & qos_initialization)

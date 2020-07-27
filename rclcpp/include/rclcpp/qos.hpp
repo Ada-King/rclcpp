@@ -19,6 +19,7 @@
 
 #include "rclcpp/duration.hpp"
 #include "rclcpp/visibility_control.hpp"
+#include "rcl/logging_rosout.h"
 #include "rmw/incompatible_qos_events_statuses.h"
 #include "rmw/qos_profiles.h"
 #include "rmw/types.h"
@@ -55,6 +56,29 @@ struct RCLCPP_PUBLIC KeepLast : public rclcpp::QoSInitialization
   explicit KeepLast(size_t depth);
 };
 
+/// Rosout QoS initialization structure.
+struct RCLCPP_PUBLIC RosoutQoSInitialization
+{
+  size_t depth;
+  rmw_qos_durability_policy_t durability_policy;
+  rmw_time_t lifespan;
+
+  /// Constructor which takes both a depth, durability, lifespan (even if it would be unused).
+  RosoutQoSInitialization(size_t depth_arg, rmw_qos_durability_policy_t durability_policy_arg, 
+  							         rmw_time_t lifespan_arg);
+
+  /// Create a QoSInitialization from an existing rmw_qos_profile_t, using its depth, durability and lifespan.
+  static
+  RosoutQoSInitialization
+  from_rcl(const rmw_qos_profile_t & rosout_qos);
+};
+
+struct RCLCPP_PUBLIC SetRosout : public rclcpp::RosoutQoSInitialization
+{
+  explicit SetRosout(size_t depth_arg, rmw_qos_durability_policy_t durability_policy_arg, 
+  	                               rmw_time_t lifespan_arg);
+};
+
 /// Encapsulation of Quality of Service settings.
 class RCLCPP_PUBLIC QoS
 {
@@ -64,6 +88,12 @@ public:
   QoS(
     const QoSInitialization & qos_initialization,
     const rmw_qos_profile_t & initial_profile = rmw_qos_profile_default);
+
+  /// Constructor which allows you to construct a Rosout QoS by giving the only required settings.
+  explicit
+  QoS(
+    const RosoutQoSInitialization & qos_initialization,
+    const rmw_qos_profile_t & initial_profile = rcl_qos_profile_rosout_default);
 
   /// Conversion constructor to ease construction in the common case of just specifying depth.
   /**
@@ -246,6 +276,28 @@ public:
   ParameterEventsQoS(
     const QoSInitialization & qos_initialization = (
       QoSInitialization::from_rmw(rmw_qos_profile_parameter_events)
+  ));
+};
+
+/**
+ * Rosout QoS class
+ *    - History: Keep last,
+ *    - Depth: 1000,
+ *    - Reliability: Reliable,
+ *    - Durability: TRANSIENT_LOCAL,
+ *    - Deadline: Default,
+ *    - Lifespan: {10, 0},
+ *    - Liveliness: System default,
+ *    - Liveliness lease duration: default,
+ *    - Avoid ros namespace conventions: false
+ */
+class RCLCPP_PUBLIC RosoutQoS : public QoS
+{
+public:
+  explicit
+  RosoutQoS(
+    const RosoutQoSInitialization & rosout_qos_initialization = (
+      RosoutQoSInitialization::from_rcl(rcl_qos_profile_rosout_default)
   ));
 };
 

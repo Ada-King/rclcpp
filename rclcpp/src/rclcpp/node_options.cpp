@@ -94,6 +94,7 @@ NodeOptions::get_rcl_node_options() const
     node_options_->allocator = this->allocator_;
     node_options_->use_global_arguments = this->use_global_arguments_;
     node_options_->enable_rosout = this->enable_rosout_;
+	node_options_->rosout_qos = this->rosout_qos_.get_rmw_qos_profile();
 
     int c_argc = 0;
     std::unique_ptr<const char *[]> c_argv;
@@ -263,6 +264,19 @@ NodeOptions &
 NodeOptions::parameter_event_qos(const rclcpp::QoS & parameter_event_qos)
 {
   this->parameter_event_qos_ = parameter_event_qos;
+  return *this;
+}
+
+const rclcpp::QoS &
+NodeOptions::rosout_qos() const
+{
+  return this->rosout_qos_;
+}
+
+NodeOptions &
+NodeOptions::rosout_qos(const rclcpp::QoS & rosout_qos)
+{
+  this->rosout_qos_ = rosout_qos;
   return *this;
 }
 
